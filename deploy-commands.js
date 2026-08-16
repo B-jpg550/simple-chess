@@ -63,6 +63,38 @@ const commands = [
                     )
         )
 
+        // ====================================================
+        // 管理者による強制終了
+        // ====================================================
+
+        .addSubcommand(
+            subcommand =>
+                subcommand
+
+                    .setName('end')
+
+                    .setDescription(
+                        '対局を強制終了します。管理者専用。'
+                    )
+
+                    .addStringOption(
+                        option =>
+                            option
+
+                                .setName(
+                                    'game_id'
+                                )
+
+                                .setDescription(
+                                    '強制終了する対局のID'
+                                )
+
+                                .setRequired(
+                                    true
+                                )
+                    )
+        )
+
 ].map(
     command =>
         command.toJSON()

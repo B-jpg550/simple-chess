@@ -3,7 +3,8 @@ require('dotenv').config();
 const {
     Client,
     GatewayIntentBits,
-    EmbedBuilder
+    EmbedBuilder,
+    PermissionFlagsBits
 } = require('discord.js');
 
 
@@ -258,6 +259,74 @@ async function recoverUserGames(
 
 
 // ============================================================
+// 管理者用 強制終了API
+// ============================================================
+
+async function endGameAsAdmin(
+    gameId,
+    reason
+) {
+
+    if (!INTERNAL_SECRET) {
+
+        throw new Error(
+            'CHESS_INTERNAL_SECRETが設定されていません。'
+        );
+
+    }
+
+
+    const response =
+        await fetch(
+            `${SERVER_URL}/api/admin/end-game`,
+            {
+
+                method:
+                    'POST',
+
+                headers: {
+
+                    'Content-Type':
+                        'application/json',
+
+                    'x-chess-internal-secret':
+                        INTERNAL_SECRET
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        gameId,
+
+                        reason
+
+                    })
+
+            }
+        );
+
+
+    const data =
+        await response.json();
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            data.message ||
+            'Admin game termination failed'
+        );
+
+    }
+
+
+    return data;
+
+}
+
+
+// ============================================================
 // Discord表示
 // ============================================================
 
@@ -294,6 +363,19 @@ function getStatus(
         game.status ===
         'finished'
     ) {
+
+        if (
+            game.result &&
+            game.result.type ===
+                'admin_termination'
+        ) {
+
+            return (
+                '🛑 管理者による強制終了'
+            );
+
+        }
+
 
         if (
             game.result &&
@@ -678,7 +760,10 @@ async function updateMonitoredMessage(
                 game.lastMove,
 
             chessStatus:
-                game.chessStatus
+                game.chessStatus,
+
+            result:
+                game.result
 
         });
 
@@ -1161,6 +1246,127 @@ client.on(
 
                     content:
                         `❌ 対局URLの取得に失敗しました。\n` +
+                        `${error.message}`,
+
+                    ephemeral:
+                        true
+
+                });
+
+            }
+
+
+            return;
+
+        }
+
+
+        // ====================================================
+        // /chess end
+        // ====================================================
+
+        if (
+            subcommand ===
+            'end'
+        ) {
+
+            // ------------------------------------------------
+            // Administrator権限確認
+            // ------------------------------------------------
+
+            if (
+                !interaction.memberPermissions
+                    ?.has(
+                        PermissionFlagsBits.Administrator
+                    )
+            ) {
+
+                await interaction.reply({
+
+                    content:
+                        '❌ このコマンドはサーバー管理者のみ使用できます。',
+
+                    ephemeral:
+                        true
+
+                });
+
+                return;
+
+            }
+
+
+            const gameId =
+                interaction.options.getString(
+                    'game_id'
+                );
+
+
+            if (!gameId) {
+
+                await interaction.reply({
+
+                    content:
+                        '❌ 対局IDを指定してください。',
+
+                    ephemeral:
+                        true
+
+                });
+
+                return;
+
+            }
+
+
+            try {
+
+                const result =
+                    await endGameAsAdmin(
+
+                        gameId,
+
+                        `管理者 ${interaction.user.username} ` +
+                        `による強制終了`
+
+                    );
+
+
+                const game =
+                    result.game;
+
+
+                await interaction.reply({
+
+                    content:
+                        `🛑 **対局を強制終了しました。**\n\n` +
+
+                        `⚪ 白：${getPlayerName(game.white)}\n` +
+
+                        `⚫ 黒：${getPlayerName(game.black)}\n` +
+
+                        `🆔 対局ID：\`${game.id}\`\n\n` +
+
+                        `管理者：${interaction.user.username}`,
+
+                    ephemeral:
+                        true
+
+                });
+
+
+            } catch (error) {
+
+                console.error(
+                    'Admin end-game error:',
+                    error
+                );
+
+
+                await interaction.reply({
+
+                    content:
+                        `❌ 対局の強制終了に失敗しました。\n` +
                         `${error.message}`,
 
                     ephemeral:

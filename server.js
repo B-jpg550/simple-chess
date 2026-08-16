@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -31,7 +33,6 @@ const WEB_PUBLIC_URL =
 const CHESS_INTERNAL_SECRET =
     process.env.CHESS_INTERNAL_SECRET ||
     '';
-
 
 app.use(cors());
 app.use(express.json());
@@ -356,6 +357,10 @@ function publicGame(
             game.finishedAt ||
             null,
 
+        result:
+            game.result ||
+            null,
+
         white: {
 
             userId:
@@ -485,6 +490,60 @@ cleanupFinishedGames();
 
 
 // ============================================================
+// 内部API認証
+// ============================================================
+
+function requireInternalSecret(
+    req,
+    res
+) {
+
+    if (!CHESS_INTERNAL_SECRET) {
+
+        res.status(500).json({
+
+            success:
+                false,
+
+            message:
+                'CHESS_INTERNAL_SECRETが設定されていません。'
+
+        });
+
+        return false;
+
+    }
+
+    const secret =
+        req.headers[
+            'x-chess-internal-secret'
+        ];
+
+    if (
+        secret !==
+        CHESS_INTERNAL_SECRET
+    ) {
+
+        res.status(403).json({
+
+            success:
+                false,
+
+            message:
+                'Internal authentication failed'
+
+        });
+
+        return false;
+
+    }
+
+    return true;
+
+}
+
+
+// ============================================================
 // APIテスト
 // ============================================================
 
@@ -580,40 +639,13 @@ app.post(
     (req, res) => {
 
         if (
-            !CHESS_INTERNAL_SECRET
+            !requireInternalSecret(
+                req,
+                res
+            )
         ) {
 
-            return res.status(500).json({
-
-                success:
-                    false,
-
-                message:
-                    'CHESS_INTERNAL_SECRETが設定されていません。'
-
-            });
-
-        }
-
-        const secret =
-            req.headers[
-                'x-chess-internal-secret'
-            ];
-
-        if (
-            secret !==
-            CHESS_INTERNAL_SECRET
-        ) {
-
-            return res.status(403).json({
-
-                success:
-                    false,
-
-                message:
-                    'Internal authentication failed'
-
-            });
+            return;
 
         }
 
@@ -637,7 +669,6 @@ app.post(
 
         const userGames = [];
 
-
         for (
             const game
                 of Object.values(games)
@@ -652,10 +683,8 @@ app.post(
 
             }
 
-
             let color =
                 null;
-
 
             if (
                 String(
@@ -669,7 +698,6 @@ app.post(
 
             }
 
-
             if (
                 String(
                     game.players.black.userId
@@ -682,13 +710,11 @@ app.post(
 
             }
 
-
             if (!color) {
 
                 continue;
 
             }
-
 
             userGames.push({
 
@@ -728,10 +754,13 @@ app.post(
 
                 playerUrl:
                     getGameUrl(
+
                         game.id,
+
                         color === chess.WHITE
                             ? game.players.white.token
                             : game.players.black.token
+
                     ),
 
                 observerUrl:
@@ -743,7 +772,6 @@ app.post(
 
         }
 
-
         res.json({
 
             success:
@@ -751,6 +779,136 @@ app.post(
 
             games:
                 userGames
+
+        });
+
+    }
+);
+
+
+// ============================================================
+// 管理者用・強制終了API
+// ============================================================
+
+app.post(
+    '/api/admin/end-game',
+    (req, res) => {
+
+        if (
+            !requireInternalSecret(
+                req,
+                res
+            )
+        ) {
+
+            return;
+
+        }
+
+        const {
+
+            gameId,
+
+            reason =
+                '管理者による強制終了'
+
+        } = req.body;
+
+
+        if (!gameId) {
+
+            return res.status(400).json({
+
+                success:
+                    false,
+
+                message:
+                    'gameId is required'
+
+            });
+
+        }
+
+
+        const game =
+            games[gameId];
+
+
+        if (!game) {
+
+            return res.status(404).json({
+
+                success:
+                    false,
+
+                message:
+                    'ゲームが見つかりません。'
+
+            });
+
+        }
+
+
+        if (
+            game.status ===
+            'finished'
+        ) {
+
+            return res.status(400).json({
+
+                success:
+                    false,
+
+                message:
+                    'このゲームはすでに終了しています。',
+
+                game:
+                    publicGame(game)
+
+            });
+
+        }
+
+
+        game.status =
+            'finished';
+
+
+        game.finishedAt =
+            new Date().toISOString();
+
+
+        game.updatedAt =
+            new Date().toISOString();
+
+
+        game.result = {
+
+            type:
+                'admin_termination',
+
+            reason:
+                String(reason),
+
+            terminatedAt:
+                game.finishedAt
+
+        };
+
+
+        saveGames();
+
+
+        res.json({
+
+            success:
+                true,
+
+            message:
+                '対局を強制終了しました。',
+
+            game:
+                publicGame(game)
 
         });
 
@@ -800,7 +958,6 @@ app.post(
                 });
 
             }
-
 
             const {
 
@@ -2070,7 +2227,7 @@ app.use(
 
 
 // ============================================================
-// 起動
+// サーバー起動
 // ============================================================
 
 app.listen(
