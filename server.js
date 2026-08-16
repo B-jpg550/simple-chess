@@ -7,14 +7,25 @@ const crypto = require('crypto');
 const chess = require('./chess.js');
 
 const app = express();
+
 const PORT = 3000;
 
-const DATA_DIR = path.join(__dirname, 'data');
-const GAMES_FILE = path.join(DATA_DIR, 'games.json');
+const DATA_DIR =
+    path.join(__dirname, 'data');
+
+const GAMES_FILE =
+    path.join(DATA_DIR, 'games.json');
+
+const FINISHED_GAME_RETENTION_MS =
+    24 * 60 * 60 * 1000;
+
+const CLEANUP_INTERVAL_MS =
+    60 * 60 * 1000;
 
 const WEB_PUBLIC_URL =
     process.env.WEB_PUBLIC_URL ||
     `http://localhost:${PORT}`;
+
 
 app.use(cors());
 app.use(express.json());
@@ -22,25 +33,36 @@ app.use(express.static('public'));
 
 
 // ============================================================
-// データ保存
+// データ
 // ============================================================
 
 function ensureDataDirectory() {
 
-    if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, {
-            recursive: true
-        });
+    if (
+        !fs.existsSync(DATA_DIR)
+    ) {
+
+        fs.mkdirSync(
+            DATA_DIR,
+            {
+                recursive: true
+            }
+        );
+
     }
 
 }
+
 
 function saveGames() {
 
     ensureDataDirectory();
 
+    const tempFile =
+        `${GAMES_FILE}.tmp`;
+
     fs.writeFileSync(
-        GAMES_FILE,
+        tempFile,
         JSON.stringify(
             games,
             null,
@@ -49,14 +71,24 @@ function saveGames() {
         'utf8'
     );
 
+    fs.renameSync(
+        tempFile,
+        GAMES_FILE
+    );
+
 }
+
 
 function loadGames() {
 
     ensureDataDirectory();
 
-    if (!fs.existsSync(GAMES_FILE)) {
+    if (
+        !fs.existsSync(GAMES_FILE)
+    ) {
+
         return {};
+
     }
 
     try {
@@ -67,11 +99,27 @@ function loadGames() {
                 'utf8'
             );
 
-        if (!raw.trim()) {
+        if (
+            !raw.trim()
+        ) {
+
             return {};
+
         }
 
-        return JSON.parse(raw);
+        const loaded =
+            JSON.parse(raw);
+
+        if (
+            !loaded ||
+            typeof loaded !== 'object'
+        ) {
+
+            return {};
+
+        }
+
+        return loaded;
 
     } catch (error) {
 
@@ -81,15 +129,18 @@ function loadGames() {
         );
 
         return {};
+
     }
 
 }
 
-const games = loadGames();
+
+const games =
+    loadGames();
 
 
 // ============================================================
-// 共通関数
+// 共通
 // ============================================================
 
 function createGameId() {
@@ -100,6 +151,7 @@ function createGameId() {
 
 }
 
+
 function createToken() {
 
     return crypto
@@ -107,6 +159,7 @@ function createToken() {
         .toString('hex');
 
 }
+
 
 function getChessState(game) {
 
@@ -122,147 +175,47 @@ function getChessState(game) {
 
 }
 
-function getStatus(game) {
+
+function getGameStatus(game) {
 
     return chess.getGameStatus(
+
         game.board,
+
         game.turn,
+
         getChessState(game)
-    );
 
-}
-
-function getGameUrl(gameId, token = null) {
-
-    const url =
-        `${WEB_PUBLIC_URL}/?game=${encodeURIComponent(gameId)}`;
-
-    if (!token) {
-        return url;
-    }
-
-    return (
-        `${url}&token=${encodeURIComponent(token)}`
     );
 
 }
 
 
-// ============================================================
-// 公開用ゲームデータ
-// ============================================================
-
-function publicGame(
-    game,
+function getGameUrl(
+    gameId,
     token = null
 ) {
 
-    let playerColor = null;
+    let url =
+        `${WEB_PUBLIC_URL}/?game=` +
+        encodeURIComponent(gameId);
 
-    if (token) {
+    if (
+        token
+    ) {
 
-        if (
-            token ===
-            game.players.white.token
-        ) {
-
-            playerColor = chess.WHITE;
-
-        } else if (
-            token ===
-            game.players.black.token
-        ) {
-
-            playerColor = chess.BLACK;
-
-        }
+        url +=
+            `&token=${encodeURIComponent(token)}`;
 
     }
 
-    const result = {
-
-        id:
-            game.id,
-
-        board:
-            game.board,
-
-        turn:
-            game.turn,
-
-        lastMove:
-            game.lastMove,
-
-        castlingRights:
-            game.castlingRights,
-
-        pendingPromotion:
-            game.pendingPromotion,
-
-        status:
-            game.status,
-
-        chessStatus:
-            getStatus(game),
-
-        createdAt:
-            game.createdAt,
-
-        updatedAt:
-            game.updatedAt,
-
-        finishedAt:
-            game.finishedAt || null,
-
-        white: {
-
-            userId:
-                game.players.white.userId,
-
-            name:
-                game.players.white.name
-
-        },
-
-        black: {
-
-            userId:
-                game.players.black.userId,
-
-            name:
-                game.players.black.name
-
-        },
-
-        discord: {
-
-            channelId:
-                game.discord.channelId || null,
-
-            messageId:
-                game.discord.messageId || null
-
-        },
-
-        playerColor:
-            playerColor,
-
-        canControl:
-            (
-                playerColor !== null &&
-                game.status === 'playing' &&
-                game.turn === playerColor
-            )
-
-    };
-
-    return result;
+    return url;
 
 }
 
 
 // ============================================================
-// ゲーム認証
+// 認証
 // ============================================================
 
 function getPlayerColor(
@@ -270,8 +223,12 @@ function getPlayerColor(
     token
 ) {
 
-    if (!token) {
+    if (
+        !token
+    ) {
+
         return null;
+
     }
 
     if (
@@ -296,6 +253,7 @@ function getPlayerColor(
 
 }
 
+
 function requirePlayer(
     game,
     token
@@ -307,16 +265,21 @@ function requirePlayer(
             token
         );
 
-    if (!color) {
+    if (
+        !color
+    ) {
 
         return {
 
             ok: false,
 
             response: {
+
                 success: false,
+
                 message:
                     '対局者用URLが必要です。'
+
             }
 
         };
@@ -327,11 +290,198 @@ function requirePlayer(
 
         ok: true,
 
-        color: color
+        color
 
     };
 
 }
+
+
+// ============================================================
+// 公開用ゲーム情報
+// ============================================================
+
+function publicGame(
+    game,
+    token = null
+) {
+
+    const playerColor =
+        getPlayerColor(
+            game,
+            token
+        );
+
+    const chessStatus =
+        getGameStatus(game);
+
+    return {
+
+        id:
+            game.id,
+
+        board:
+            game.board,
+
+        turn:
+            game.turn,
+
+        lastMove:
+            game.lastMove,
+
+        castlingRights:
+            game.castlingRights,
+
+        pendingPromotion:
+            game.pendingPromotion,
+
+        status:
+            game.status,
+
+        chessStatus,
+
+        createdAt:
+            game.createdAt,
+
+        updatedAt:
+            game.updatedAt,
+
+        finishedAt:
+            game.finishedAt ||
+            null,
+
+        white: {
+
+            userId:
+                game.players.white.userId,
+
+            name:
+                game.players.white.name
+
+        },
+
+        black: {
+
+            userId:
+                game.players.black.userId,
+
+            name:
+                game.players.black.name
+
+        },
+
+        discord: {
+
+            channelId:
+                game.discord?.channelId ||
+                null,
+
+            messageId:
+                game.discord?.messageId ||
+                null
+
+        },
+
+        playerColor,
+
+        canControl:
+            Boolean(
+                playerColor &&
+                game.status === 'playing' &&
+                game.turn === playerColor
+            )
+
+    };
+
+}
+
+
+// ============================================================
+// 終了対局の整理
+// ============================================================
+
+function cleanupFinishedGames() {
+
+    const now =
+        Date.now();
+
+    let removed =
+        0;
+
+    for (
+        const [gameId, game]
+            of Object.entries(games)
+    ) {
+
+        if (
+            game.status !==
+            'finished'
+        ) {
+
+            continue;
+
+        }
+
+        if (
+            !game.finishedAt
+        ) {
+
+            continue;
+
+        }
+
+        const finishedAt =
+            new Date(
+                game.finishedAt
+            ).getTime();
+
+        if (
+            !Number.isFinite(
+                finishedAt
+            )
+        ) {
+
+            continue;
+
+        }
+
+        if (
+            now -
+            finishedAt >=
+            FINISHED_GAME_RETENTION_MS
+        ) {
+
+            delete games[gameId];
+
+            removed++;
+
+        }
+
+    }
+
+    if (
+        removed > 0
+    ) {
+
+        saveGames();
+
+        console.log(
+            `終了済みゲーム ${removed} 件を整理しました。`
+        );
+
+    }
+
+}
+
+
+setInterval(
+    cleanupFinishedGames,
+    CLEANUP_INTERVAL_MS
+);
+
+
+// 起動直後にも一度整理
+cleanupFinishedGames();
 
 
 // ============================================================
@@ -344,7 +494,8 @@ app.get(
 
         res.json({
 
-            success: true,
+            success:
+                true,
 
             message:
                 'Discord Chess Server is connected',
@@ -372,30 +523,37 @@ app.get(
         const result =
             Object.values(games)
 
-                .filter(game => {
+                .filter(
+                    game => {
 
-                    if (!activeOnly) {
-                        return true;
+                        if (
+                            !activeOnly
+                        ) {
+
+                            return true;
+
+                        }
+
+                        return (
+                            game.status ===
+                            'playing'
+                        );
+
                     }
+                )
 
-                    return (
-                        game.status ===
-                        'playing'
-                    );
-
-                })
-
-                .map(game => {
-
-                    return publicGame(game);
-
-                });
+                .map(
+                    game =>
+                        publicGame(game)
+                );
 
         res.json({
 
-            success: true,
+            success:
+                true,
 
-            games: result
+            games:
+                result
 
         });
 
@@ -416,6 +574,7 @@ app.post(
             const {
 
                 whiteUserId,
+
                 blackUserId,
 
                 whiteName =
@@ -433,7 +592,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'whiteUserId and blackUserId are required'
@@ -443,13 +603,14 @@ app.post(
             }
 
             if (
-                whiteUserId ===
-                blackUserId
+                String(whiteUserId) ===
+                String(blackUserId)
             ) {
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         '同じユーザー同士では対局できません。'
@@ -497,6 +658,9 @@ app.post(
                     now,
 
                 finishedAt:
+                    null,
+
+                result:
                     null,
 
                 players: {
@@ -548,10 +712,10 @@ app.post(
 
             res.status(201).json({
 
-                success: true,
+                success:
+                    true,
 
-                gameId:
-                    gameId,
+                gameId,
 
                 game:
                     publicGame(game),
@@ -573,17 +737,23 @@ app.post(
                 },
 
                 observerUrl:
-                    getGameUrl(gameId)
+                    getGameUrl(
+                        gameId
+                    )
 
             });
 
         } catch (error) {
 
-            console.error(error);
+            console.error(
+                'Game creation error:',
+                error
+            );
 
             res.status(500).json({
 
-                success: false,
+                success:
+                    false,
 
                 message:
                     'ゲームの作成に失敗しました。'
@@ -605,13 +775,18 @@ app.get(
     (req, res) => {
 
         const game =
-            games[req.params.gameId];
+            games[
+                req.params.gameId
+            ];
 
-        if (!game) {
+        if (
+            !game
+        ) {
 
             return res.status(404).json({
 
-                success: false,
+                success:
+                    false,
 
                 message:
                     'ゲームが見つかりません。'
@@ -628,7 +803,8 @@ app.get(
 
         res.json({
 
-            success: true,
+            success:
+                true,
 
             game:
                 publicGame(
@@ -643,7 +819,7 @@ app.get(
 
 
 // ============================================================
-// Discordメッセージ情報登録
+// Discordメッセージ登録
 // ============================================================
 
 app.post(
@@ -651,13 +827,18 @@ app.post(
     (req, res) => {
 
         const game =
-            games[req.params.gameId];
+            games[
+                req.params.gameId
+            ];
 
-        if (!game) {
+        if (
+            !game
+        ) {
 
             return res.status(404).json({
 
-                success: false,
+                success:
+                    false,
 
                 message:
                     'ゲームが見つかりません。'
@@ -669,6 +850,7 @@ app.post(
         const {
 
             channelId,
+
             messageId
 
         } = req.body;
@@ -680,7 +862,8 @@ app.post(
 
             return res.status(400).json({
 
-                success: false,
+                success:
+                    false,
 
                 message:
                     'channelId and messageId are required'
@@ -689,11 +872,15 @@ app.post(
 
         }
 
-        game.discord.channelId =
-            String(channelId);
+        game.discord = {
 
-        game.discord.messageId =
-            String(messageId);
+            channelId:
+                String(channelId),
+
+            messageId:
+                String(messageId)
+
+        };
 
         game.updatedAt =
             new Date().toISOString();
@@ -702,7 +889,8 @@ app.post(
 
         res.json({
 
-            success: true,
+            success:
+                true,
 
             game:
                 publicGame(game)
@@ -714,7 +902,7 @@ app.post(
 
 
 // ============================================================
-// 合法手取得
+// 合法手
 // ============================================================
 
 app.post(
@@ -724,13 +912,18 @@ app.post(
         try {
 
             const game =
-                games[req.params.gameId];
+                games[
+                    req.params.gameId
+                ];
 
-            if (!game) {
+            if (
+                !game
+            ) {
 
                 return res.status(404).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'ゲームが見つかりません。'
@@ -743,11 +936,14 @@ app.post(
                 square
             } = req.body;
 
-            if (!square) {
+            if (
+                !square
+            ) {
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'square is required'
@@ -768,7 +964,9 @@ app.post(
                     token
                 );
 
-            if (!auth.ok) {
+            if (
+                !auth.ok
+            ) {
 
                 return res.status(403).json(
                     auth.response
@@ -783,7 +981,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'このゲームは終了しています。'
@@ -799,7 +998,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         '現在の手番ではありません。'
@@ -810,28 +1010,37 @@ app.post(
 
             const moves =
                 chess.getLegalMoves(
+
                     game.board,
+
                     square,
+
                     game.turn,
+
                     getChessState(game)
+
                 );
 
             res.json({
 
-                success: true,
+                success:
+                    true,
 
-                moves:
-                    moves
+                moves
 
             });
 
         } catch (error) {
 
-            console.error(error);
+            console.error(
+                'Legal moves error:',
+                error
+            );
 
             res.status(500).json({
 
-                success: false,
+                success:
+                    false,
 
                 message:
                     '合法手の取得に失敗しました。'
@@ -845,7 +1054,7 @@ app.post(
 
 
 // ============================================================
-// 指し手
+// 移動
 // ============================================================
 
 app.post(
@@ -855,13 +1064,18 @@ app.post(
         try {
 
             const game =
-                games[req.params.gameId];
+                games[
+                    req.params.gameId
+                ];
 
-            if (!game) {
+            if (
+                !game
+            ) {
 
                 return res.status(404).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'ゲームが見つかりません。'
@@ -871,9 +1085,13 @@ app.post(
             }
 
             const {
+
                 from,
+
                 to,
+
                 token
+
             } = req.body;
 
             if (
@@ -884,7 +1102,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'from, to, token are required'
@@ -899,7 +1118,9 @@ app.post(
                     token
                 );
 
-            if (!auth.ok) {
+            if (
+                !auth.ok
+            ) {
 
                 return res.status(403).json(
                     auth.response
@@ -914,7 +1135,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'このゲームは終了しています。'
@@ -930,7 +1152,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         '現在の手番ではありません。'
@@ -940,21 +1163,28 @@ app.post(
             }
 
             const currentStatus =
-                getStatus(game);
+                getGameStatus(game);
 
             if (
                 currentStatus ===
-                    'checkmate' ||
+                'checkmate' ||
                 currentStatus ===
-                    'stalemate'
+                'stalemate'
             ) {
 
                 game.status =
                     'finished';
 
+                game.finishedAt =
+                    game.finishedAt ||
+                    new Date().toISOString();
+
+                saveGames();
+
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'このゲームは終了しています。'
@@ -965,23 +1195,34 @@ app.post(
 
             const legalMoves =
                 chess.getLegalMoves(
+
                     game.board,
+
                     from,
+
                     game.turn,
+
                     getChessState(game)
+
                 );
 
             const selectedMove =
                 legalMoves.find(
+
                     move =>
-                        move.to === to
+                        move.to ===
+                        to
+
                 );
 
-            if (!selectedMove) {
+            if (
+                !selectedMove
+            ) {
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'Illegal move'
@@ -995,8 +1236,11 @@ app.post(
 
             const result =
                 chess.makeGameMove(
+
                     game,
+
                     selectedMove
+
                 );
 
             game.updatedAt =
@@ -1011,7 +1255,8 @@ app.post(
 
                 return res.json({
 
-                    success: true,
+                    success:
+                        true,
 
                     promotion:
                         true,
@@ -1032,13 +1277,13 @@ app.post(
                 );
 
             const status =
-                getStatus(game);
+                getGameStatus(game);
 
             if (
                 status ===
-                    'checkmate' ||
+                'checkmate' ||
                 status ===
-                    'stalemate'
+                'stalemate'
             ) {
 
                 game.status =
@@ -1053,13 +1298,12 @@ app.post(
 
             res.json({
 
-                success: true,
+                success:
+                    true,
 
-                result:
-                    result,
+                result,
 
-                status:
-                    status,
+                status,
 
                 game:
                     publicGame(
@@ -1071,11 +1315,15 @@ app.post(
 
         } catch (error) {
 
-            console.error(error);
+            console.error(
+                'Move error:',
+                error
+            );
 
             res.status(500).json({
 
-                success: false,
+                success:
+                    false,
 
                 message:
                     '指し手の処理に失敗しました。'
@@ -1099,13 +1347,18 @@ app.post(
         try {
 
             const game =
-                games[req.params.gameId];
+                games[
+                    req.params.gameId
+                ];
 
-            if (!game) {
+            if (
+                !game
+            ) {
 
                 return res.status(404).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'ゲームが見つかりません。'
@@ -1115,8 +1368,11 @@ app.post(
             }
 
             const {
+
                 type,
+
                 token
+
             } = req.body;
 
             if (
@@ -1126,7 +1382,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'type and token are required'
@@ -1141,7 +1398,9 @@ app.post(
                     token
                 );
 
-            if (!auth.ok) {
+            if (
+                !auth.ok
+            ) {
 
                 return res.status(403).json(
                     auth.response
@@ -1156,7 +1415,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'このゲームは終了しています。'
@@ -1172,7 +1432,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         '現在の手番ではありません。'
@@ -1187,7 +1448,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         '昇格待ちではありません。'
@@ -1201,16 +1463,23 @@ app.post(
 
             const result =
                 chess.promotePawn(
+
                     game,
+
                     game.pendingPromotion,
+
                     type
+
                 );
 
-            if (!result) {
+            if (
+                !result
+            ) {
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         '無効な昇格です。'
@@ -1228,13 +1497,13 @@ app.post(
                 new Date().toISOString();
 
             const status =
-                getStatus(game);
+                getGameStatus(game);
 
             if (
                 status ===
-                    'checkmate' ||
+                'checkmate' ||
                 status ===
-                    'stalemate'
+                'stalemate'
             ) {
 
                 game.status =
@@ -1249,10 +1518,10 @@ app.post(
 
             res.json({
 
-                success: true,
+                success:
+                    true,
 
-                status:
-                    status,
+                status,
 
                 game:
                     publicGame(
@@ -1264,11 +1533,15 @@ app.post(
 
         } catch (error) {
 
-            console.error(error);
+            console.error(
+                'Promotion error:',
+                error
+            );
 
             res.status(500).json({
 
-                success: false,
+                success:
+                    false,
 
                 message:
                     '昇格処理に失敗しました。'
@@ -1292,13 +1565,18 @@ app.post(
         try {
 
             const game =
-                games[req.params.gameId];
+                games[
+                    req.params.gameId
+                ];
 
-            if (!game) {
+            if (
+                !game
+            ) {
 
                 return res.status(404).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'ゲームが見つかりません。'
@@ -1317,7 +1595,9 @@ app.post(
                     token
                 );
 
-            if (!auth.ok) {
+            if (
+                !auth.ok
+            ) {
 
                 return res.status(403).json(
                     auth.response
@@ -1332,7 +1612,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'このゲームは終了しています。'
@@ -1348,7 +1629,8 @@ app.post(
 
                 return res.status(400).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         '現在の手番ではありません。'
@@ -1379,11 +1661,9 @@ app.post(
                 type:
                     'resignation',
 
-                loser:
-                    loser,
+                loser,
 
-                winner:
-                    winner
+                winner
 
             };
 
@@ -1391,7 +1671,8 @@ app.post(
 
             res.json({
 
-                success: true,
+                success:
+                    true,
 
                 result:
                     game.result,
@@ -1406,11 +1687,15 @@ app.post(
 
         } catch (error) {
 
-            console.error(error);
+            console.error(
+                'Resign error:',
+                error
+            );
 
             res.status(500).json({
 
-                success: false,
+                success:
+                    false,
 
                 message:
                     '投了処理に失敗しました。'
@@ -1424,7 +1709,7 @@ app.post(
 
 
 // ============================================================
-// ゲームリセット
+// リセット
 // ============================================================
 
 app.post(
@@ -1434,13 +1719,18 @@ app.post(
         try {
 
             const game =
-                games[req.params.gameId];
+                games[
+                    req.params.gameId
+                ];
 
-            if (!game) {
+            if (
+                !game
+            ) {
 
                 return res.status(404).json({
 
-                    success: false,
+                    success:
+                        false,
 
                     message:
                         'ゲームが見つかりません。'
@@ -1459,7 +1749,9 @@ app.post(
                     token
                 );
 
-            if (!auth.ok) {
+            if (
+                !auth.ok
+            ) {
 
                 return res.status(403).json(
                     auth.response
@@ -1501,7 +1793,8 @@ app.post(
 
             res.json({
 
-                success: true,
+                success:
+                    true,
 
                 game:
                     publicGame(
@@ -1513,11 +1806,15 @@ app.post(
 
         } catch (error) {
 
-            console.error(error);
+            console.error(
+                'Reset error:',
+                error
+            );
 
             res.status(500).json({
 
-                success: false,
+                success:
+                    false,
 
                 message:
                     'リセットに失敗しました。'
@@ -1525,6 +1822,37 @@ app.post(
             });
 
         }
+
+    }
+);
+
+
+// ============================================================
+// 404
+// ============================================================
+
+app.use(
+    (req, res) => {
+
+        if (
+            req.path.startsWith('/api/')
+        ) {
+
+            return res.status(404).json({
+
+                success:
+                    false,
+
+                message:
+                    'API endpoint not found'
+
+            });
+
+        }
+
+        res.status(404).send(
+            'Not Found'
+        );
 
     }
 );
@@ -1557,6 +1885,10 @@ app.listen(
         );
 
         console.log(
+            `Games: http://localhost:${PORT}/api/games`
+        );
+
+        console.log(
             `保存先: ${GAMES_FILE}`
         );
 
@@ -1564,6 +1896,10 @@ app.listen(
             `登録ゲーム数: ${
                 Object.keys(games).length
             }`
+        );
+
+        console.log(
+            '終了対局の保存期間: 24時間'
         );
 
         console.log(
