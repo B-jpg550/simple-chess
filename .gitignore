@@ -1,0 +1,12 @@
+﻿node_modules/
+.env
+data/
+*.log
+
+*-backup.*
+*-old-backup.*
+*-before-*.*
+*-broken.*
+index.js
+index-discord-current.js
+server-backup2.js

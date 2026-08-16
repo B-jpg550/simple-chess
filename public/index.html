@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
+
+<title>Discord Chess</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+
+    margin: 0;
+
+    min-height: 100vh;
+
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
+    background:
+        #f3f4f6;
+
+    color:
+        #111827;
+
+    display:
+        flex;
+
+    justify-content:
+        center;
+
+    padding:
+        24px;
+
+}
+
+.container {
+
+    width:
+        min(100%, 900px);
+
+}
+
+header {
+
+    margin-bottom:
+        20px;
+
+}
+
+h1 {
+
+    margin:
+        0 0 8px;
+
+}
+
+.subtitle {
+
+    color:
+        #6b7280;
+
+}
+
+.info {
+
+    background:
+        white;
+
+    border-radius:
+        14px;
+
+    padding:
+        16px;
+
+    margin-bottom:
+        18px;
+
+    box-shadow:
+        0 4px 16px
+        rgba(0,0,0,.08);
+
+}
+
+.player-row {
+
+    display:
+        flex;
+
+    justify-content:
+        space-between;
+
+    gap:
+        12px;
+
+    margin-bottom:
+        8px;
+
+}
+
+.status {
+
+    font-weight:
+        700;
+
+    margin-top:
+        10px;
+
+}
+
+.turn {
+
+    display:
+        inline-block;
+
+    margin-top:
+        10px;
+
+    padding:
+        8px 12px;
+
+    border-radius:
+        999px;
+
+    background:
+        #eef2ff;
+
+}
+
+.board-wrapper {
+
+    width:
+        min(92vw, 720px);
+
+    margin:
+        0 auto;
+
+}
+
+.board {
+
+    width:
+        100%;
+
+    aspect-ratio:
+        1 / 1;
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(8, 1fr);
+
+    border:
+        4px solid #1f2937;
+
+    border-radius:
+        8px;
+
+    overflow:
+        hidden;
+
+    box-shadow:
+        0 8px 30px
+        rgba(0,0,0,.18);
+
+}
+
+.square {
+
+    border:
+        0;
+
+    padding:
+        0;
+
+    margin:
+        0;
+
+    position:
+        relative;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    font-size:
+        clamp(30px, 7vw, 64px);
+
+    cursor:
+        pointer;
+
+    user-select:
+        none;
+
+}
+
+.square.light {
+
+    background:
+        #f0d9b5;
+
+}
+
+.square.dark {
+
+    background:
+        #b58863;
+
+}
+
+.square.selected {
+
+    outline:
+        5px solid #2563eb;
+
+    outline-offset:
+        -5px;
+
+}
+
+.square.legal {
+
+    box-shadow:
+        inset 0 0 0 7px
+        rgba(34,197,94,.65);
+
+}
+
+.square.capture {
+
+    box-shadow:
+        inset 0 0 0 7px
+        rgba(239,68,68,.7);
+
+}
+
+.coord-file {
+
+    position:
+        absolute;
+
+    bottom:
+        4px;
+
+    right:
+        6px;
+
+    font-size:
+        12px;
+
+    font-weight:
+        700;
+
+    opacity:
+        .65;
+
+}
+
+.coord-rank {
+
+    position:
+        absolute;
+
+    top:
+        4px;
+
+    left:
+        6px;
+
+    font-size:
+        12px;
+
+    font-weight:
+        700;
+
+    opacity:
+        .65;
+
+}
+
+.controls {
+
+    margin-top:
+        18px;
+
+    display:
+        flex;
+
+    justify-content:
+        center;
+
+    gap:
+        10px;
+
+    flex-wrap:
+        wrap;
+
+}
+
+button.action {
+
+    border:
+        0;
+
+    border-radius:
+        10px;
+
+    padding:
+        11px 18px;
+
+    font-size:
+        15px;
+
+    font-weight:
+        700;
+
+    cursor:
+        pointer;
+
+}
+
+button.resign {
+
+    background:
+        #dc2626;
+
+    color:
+        white;
+
+}
+
+button.resign:hover {
+
+    background:
+        #b91c1c;
+
+}
+
+.message {
+
+    min-height:
+        28px;
+
+    margin:
+        16px 0;
+
+    text-align:
+        center;
+
+    font-weight:
+        700;
+
+}
+
+.message.error {
+
+    color:
+        #dc2626;
+
+}
+
+.message.success {
+
+    color:
+        #15803d;
+
+}
+
+.overlay {
+
+    position:
+        fixed;
+
+    inset:
+        0;
+
+    background:
+        rgba(17,24,39,.65);
+
+    display:
+        none;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    padding:
+        20px;
+
+}
+
+.overlay.show {
+
+    display:
+        flex;
+
+}
+
+.promotion-box {
+
+    width:
+        min(100%, 420px);
+
+    background:
+        white;
+
+    border-radius:
+        18px;
+
+    padding:
+        24px;
+
+    box-shadow:
+        0 20px 60px
+        rgba(0,0,0,.25);
+
+}
+
+.promotion-box h2 {
+
+    margin-top:
+        0;
+
+    text-align:
+        center;
+
+}
+
+.promotion-buttons {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(2, 1fr);
+
+    gap:
+        10px;
+
+}
+
+.promotion-buttons button {
+
+    border:
+        0;
+
+    border-radius:
+        12px;
+
+    padding:
+        16px;
+
+    font-size:
+        18px;
+
+    cursor:
+        pointer;
+
+    background:
+        #e5e7eb;
+
+}
+
+.game-over {
+
+    margin-top:
+        18px;
+
+    padding:
+        18px;
+
+    background:
+        #fff7ed;
+
+    border:
+        1px solid #fed7aa;
+
+    border-radius:
+        12px;
+
+    text-align:
+        center;
+
+    font-weight:
+        700;
+
+    display:
+        none;
+
+}
+
+.game-over.show {
+
+    display:
+        block;
+
+}
+
+.small {
+
+    font-size:
+        13px;
+
+    color:
+        #6b7280;
+
+}
+
+.loading {
+
+    text-align:
+        center;
+
+    padding:
+        40px;
+
+}
+
+.readonly {
+
+    color:
+        #6b7280;
+
+    text-align:
+        center;
+
+    margin-top:
+        10px;
+
+    font-size:
+        14px;
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+    <header>
+
+        <h1>♟ Discord Chess</h1>
+
+        <div class="subtitle">
+            Web対局・Discord観戦システム
+        </div>
+
+    </header>
+
+
+    <div
+        id="loading"
+        class="loading"
+    >
+        ゲームを読み込んでいます...
+    </div>
+
+
+    <div
+        id="content"
+        style="display:none;"
+    >
+
+        <div class="info">
+
+            <div class="player-row">
+
+                <strong>
+                    ⚪ 白
+                </strong>
+
+                <span id="whitePlayer">
+                    -
+                </span>
+
+            </div>
+
+            <div class="player-row">
+
+                <strong>
+                    ⚫ 黒
+                </strong>
+
+                <span id="blackPlayer">
+                    -
+                </span>
+
+            </div>
+
+            <div
+                id="status"
+                class="status"
+            >
+                -
+            </div>
+
+            <div
+                id="turn"
+                class="turn"
+            >
+                -
+            </div>
+
+            <div
+                id="readonly"
+                class="readonly"
+                style="display:none;"
+            >
+                観戦モードです。駒は操作できません。
+            </div>
+
+        </div>
+
+
+        <div
+            id="message"
+            class="message"
+        ></div>
+
+
+        <div class="board-wrapper">
+
+            <div
+                id="board"
+                class="board"
+            ></div>
+
+        </div>
+
+
+        <div class="controls">
+
+            <button
+                id="resignButton"
+                class="action resign"
+            >
+                🏳️ 投了
+            </button>
+
+        </div>
+
+
+        <div
+            id="gameOver"
+            class="game-over"
+        ></div>
+
+    </div>
+
+</div>
+
+
+<div
+    id="promotionOverlay"
+    class="overlay"
+>
+
+    <div class="promotion-box">
+
+        <h2>👑 昇格</h2>
+
+        <div
+            id="promotionButtons"
+            class="promotion-buttons"
+        >
+
+            <button data-type="queen">
+                ♕ クイーン
+            </button>
+
+            <button data-type="rook">
+                ♖ ルーク
+            </button>
+
+            <button data-type="bishop">
+                ♗ ビショップ
+            </button>
+
+            <button data-type="knight">
+                ♘ ナイト
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+const params =
+    new URLSearchParams(
+        window.location.search
+    );
+
+const gameId =
+    params.get('game');
+
+const token =
+    params.get('token');
+
+
+let game = null;
+
+let selectedSquare = null;
+
+let legalMoves = [];
+
+let loadingGame = false;
+
+let previousSnapshot = null;
+
+
+const loadingElement =
+    document.getElementById(
+        'loading'
+    );
+
+const contentElement =
+    document.getElementById(
+        'content'
+    );
+
+const boardElement =
+    document.getElementById(
+        'board'
+    );
+
+const whitePlayerElement =
+    document.getElementById(
+        'whitePlayer'
+    );
+
+const blackPlayerElement =
+    document.getElementById(
+        'blackPlayer'
+    );
+
+const statusElement =
+    document.getElementById(
+        'status'
+    );
+
+const turnElement =
+    document.getElementById(
+        'turn'
+    );
+
+const readonlyElement =
+    document.getElementById(
+        'readonly'
+    );
+
+const messageElement =
+    document.getElementById(
+        'message'
+    );
+
+const gameOverElement =
+    document.getElementById(
+        'gameOver'
+    );
+
+const resignButton =
+    document.getElementById(
+        'resignButton'
+    );
+
+const promotionOverlay =
+    document.getElementById(
+        'promotionOverlay'
+    );
+
+
+function showMessage(
+    text,
+    type = ''
+) {
+
+    messageElement.textContent =
+        text;
+
+    messageElement.className =
+        'message';
+
+    if (type) {
+
+        messageElement.classList.add(
+            type
+        );
+
+    }
+
+}
+
+
+function setLoading(
+    value
+) {
+
+    if (value) {
+
+        loadingElement.style.display =
+            'block';
+
+        contentElement.style.display =
+            'none';
+
+    } else {
+
+        loadingElement.style.display =
+            'none';
+
+        contentElement.style.display =
+            'block';
+
+    }
+
+}
+
+
+function getSnapshot(
+    currentGame
+) {
+
+    if (!currentGame) {
+        return null;
+    }
+
+    return JSON.stringify({
+
+        board:
+            currentGame.board,
+
+        turn:
+            currentGame.turn,
+
+        lastMove:
+            currentGame.lastMove,
+
+        status:
+            currentGame.status,
+
+        chessStatus:
+            currentGame.chessStatus,
+
+        pendingPromotion:
+            currentGame.pendingPromotion
+
+    });
+
+}
+
+
+function renderGame() {
+
+    if (!game) {
+        return;
+    }
+
+
+    whitePlayerElement.textContent =
+        game.white?.name ||
+        '白';
+
+    blackPlayerElement.textContent =
+        game.black?.name ||
+        '黒';
+
+
+    if (
+        game.status === 'finished'
+    ) {
+
+        if (
+            game.result &&
+            game.result.type ===
+                'resignation'
+        ) {
+
+            const winnerName =
+                game.result.winner ===
+                    'white'
+                    ? game.white.name
+                    : game.black.name;
+
+            statusElement.textContent =
+                `🏳️ 投了。${winnerName}の勝利`;
+
+        } else if (
+            game.chessStatus ===
+                'checkmate'
+        ) {
+
+            const winnerName =
+                game.turn === 'white'
+                    ? game.black.name
+                    : game.white.name;
+
+            statusElement.textContent =
+                `💥 チェックメイト。${winnerName}の勝利`;
+
+        } else if (
+            game.chessStatus ===
+                'stalemate'
+        ) {
+
+            statusElement.textContent =
+                '🤝 ステイルメイト。引き分け';
+
+        } else {
+
+            statusElement.textContent =
+                '🏁 対局終了';
+
+        }
+
+    } else if (
+        game.chessStatus ===
+            'check'
+    ) {
+
+        statusElement.textContent =
+            '⚠️ チェック';
+
+    } else {
+
+        statusElement.textContent =
+            '🎮 対局中';
+
+    }
+
+
+    if (
+        game.turn === 'white'
+    ) {
+
+        turnElement.textContent =
+            '⚪ 白の手番';
+
+    } else {
+
+        turnElement.textContent =
+            '⚫ 黒の手番';
+
+    }
+
+
+    const canControl =
+        Boolean(
+            token &&
+            game.canControl
+        );
+
+
+    if (canControl) {
+
+        readonlyElement.style.display =
+            'none';
+
+        resignButton.style.display =
+            game.status === 'playing'
+                ? 'inline-block'
+                : 'none';
+
+    } else {
+
+        readonlyElement.style.display =
+            'block';
+
+        resignButton.style.display =
+            'none';
+
+    }
+
+
+    renderBoard();
+
+
+    if (
+        game.status === 'finished'
+    ) {
+
+        gameOverElement.classList.add(
+            'show'
+        );
+
+        gameOverElement.textContent =
+            statusElement.textContent;
+
+    } else {
+
+        gameOverElement.classList.remove(
+            'show'
+        );
+
+    }
+
+}
+
+
+function renderBoard() {
+
+    boardElement.innerHTML = '';
+
+
+    for (
+        let row = 0;
+        row < 8;
+        row++
+    ) {
+
+        for (
+            let col = 0;
+            col < 8;
+            col++
+        ) {
+
+            const square =
+                document.createElement(
+                    'button'
+                );
+
+            square.className =
+                'square ' +
+                (
+                    (row + col) % 2 === 0
+                        ? 'light'
+                        : 'dark'
+                );
+
+
+            const squareName =
+                `${'abcdefgh'[col]}${8 - row}`;
+
+
+            const piece =
+                game.board[row][col];
+
+
+            square.dataset.square =
+                squareName;
+
+
+            square.textContent =
+                piece;
+
+
+            if (
+                selectedSquare ===
+                squareName
+            ) {
+
+                square.classList.add(
+                    'selected'
+                );
+
+            }
+
+
+            const legalMove =
+                legalMoves.find(
+                    move =>
+                        move.to ===
+                        squareName
+                );
+
+
+            if (legalMove) {
+
+                if (
+                    legalMove.capture
+                ) {
+
+                    square.classList.add(
+                        'capture'
+                    );
+
+                } else {
+
+                    square.classList.add(
+                        'legal'
+                    );
+
+                }
+
+            }
+
+
+            if (col === 7) {
+
+                const file =
+                    document.createElement(
+                        'span'
+                    );
+
+                file.className =
+                    'coord-file';
+
+                file.textContent =
+                    squareName[0];
+
+                square.appendChild(
+                    file
+                );
+
+            }
+
+
+            if (row === 0) {
+
+                const rank =
+                    document.createElement(
+                        'span'
+                    );
+
+                rank.className =
+                    'coord-rank';
+
+                rank.textContent =
+                    squareName[1];
+
+                square.appendChild(
+                    rank
+                );
+
+            }
+
+
+            square.addEventListener(
+                'click',
+                () => {
+
+                    handleSquareClick(
+                        squareName
+                    );
+
+                }
+            );
+
+
+            boardElement.appendChild(
+                square
+            );
+
+        }
+
+    }
+
+}
+
+
+function getApiGameUrl() {
+
+    return (
+        `/api/game/${encodeURIComponent(
+            gameId
+        )}`
+    );
+
+}
+
+
+async function loadGame(
+    forceRender = false
+) {
+
+    if (
+        !gameId ||
+        loadingGame
+    ) {
+
+        return;
+
+    }
+
+    loadingGame = true;
+
+    try {
+
+        const response =
+            await fetch(
+                getApiGameUrl() +
+                (
+                    token
+                        ? `?token=${encodeURIComponent(token)}`
+                        : ''
+                ),
+                {
+                    cache: 'no-store'
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.message ||
+                'ゲームを取得できませんでした。'
+            );
+
+        }
+
+
+        const newSnapshot =
+            getSnapshot(
+                data.game
+            );
+
+
+        game =
+            data.game;
+
+
+        if (
+            forceRender ||
+            newSnapshot !==
+                previousSnapshot
+        ) {
+
+            previousSnapshot =
+                newSnapshot;
+
+            renderGame();
+
+        }
+
+
+        if (
+            game.pendingPromotion &&
+            game.canControl
+        ) {
+
+            promotionOverlay.classList.add(
+                'show'
+            );
+
+        }
+
+
+        showMessage('');
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+        showMessage(
+            error.message ||
+            'ゲームの読み込みに失敗しました。',
+            'error'
+        );
+
+        if (!game) {
+
+            setLoading(false);
+
+        }
+
+        return;
+
+    } finally {
+
+        loadingGame =
+            false;
+
+    }
+
+    setLoading(false);
+
+}
+
+
+async function handleSquareClick(
+    square
+) {
+
+    if (!game) {
+        return;
+    }
+
+    if (
+        game.status !==
+        'playing'
+    ) {
+
+        return;
+
+    }
+
+    if (
+        !token ||
+        !game.canControl
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        game.pendingPromotion
+    ) {
+
+        return;
+
+    }
+
+
+    if (selectedSquare) {
+
+        const targetMove =
+            legalMoves.find(
+                move =>
+                    move.to === square
+            );
+
+
+        if (targetMove) {
+
+            await makeMove(
+                selectedSquare,
+                square
+            );
+
+            return;
+
+        }
+
+
+        if (
+            selectedSquare ===
+            square
+        ) {
+
+            selectedSquare =
+                null;
+
+            legalMoves =
+                [];
+
+            renderBoard();
+
+            return;
+
+        }
+
+    }
+
+
+    const piece =
+        getPieceAt(
+            square
+        );
+
+
+    if (
+        !piece ||
+        getPieceColor(piece) !==
+            game.turn
+    ) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `/api/game/${encodeURIComponent(
+                    gameId
+                )}/legal-moves` +
+                `?token=${encodeURIComponent(token)}`,
+                {
+
+                    method:
+                        'POST',
+
+                    headers: {
+
+                        'Content-Type':
+                            'application/json'
+
+                    },
+
+                    body:
+                        JSON.stringify({
+                            square
+                        })
+
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.message ||
+                '合法手を取得できませんでした。'
+            );
+
+        }
+
+
+        selectedSquare =
+            square;
+
+        legalMoves =
+            data.moves || [];
+
+        renderBoard();
+
+    } catch (error) {
+
+        showMessage(
+            error.message,
+            'error'
+        );
+
+    }
+
+}
+
+
+function getPieceAt(
+    square
+) {
+
+    const row =
+        8 -
+        Number(
+            square[1]
+        );
+
+    const col =
+        'abcdefgh'.indexOf(
+            square[0]
+        );
+
+    return game.board[row][col];
+
+}
+
+
+function getPieceColor(
+    piece
+) {
+
+    if (
+        '♙♖♘♗♕♔'.includes(
+            piece
+        )
+    ) {
+
+        return 'white';
+
+    }
+
+    if (
+        '♟♜♞♝♛♚'.includes(
+            piece
+        )
+    ) {
+
+        return 'black';
+
+    }
+
+    return null;
+
+}
+
+
+async function makeMove(
+    from,
+    to
+) {
+
+    try {
+
+        showMessage(
+            '指し手を送信しています...'
+        );
+
+
+        const response =
+            await fetch(
+                `/api/game/${encodeURIComponent(
+                    gameId
+                )}/move`,
+                {
+
+                    method:
+                        'POST',
+
+                    headers: {
+
+                        'Content-Type':
+                            'application/json'
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            from,
+                            to,
+                            token
+
+                        })
+
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.message ||
+                '指し手に失敗しました。'
+            );
+
+        }
+
+
+        selectedSquare =
+            null;
+
+        legalMoves =
+            [];
+
+
+        game =
+            data.game;
+
+        previousSnapshot =
+            getSnapshot(game);
+
+
+        renderGame();
+
+
+        if (
+            data.promotion
+        ) {
+
+            promotionOverlay.classList.add(
+                'show'
+            );
+
+            showMessage(
+                '昇格する駒を選択してください。'
+            );
+
+            return;
+
+        }
+
+
+        showMessage(
+            '指し手を反映しました。',
+            'success'
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+        showMessage(
+            error.message ||
+            '指し手に失敗しました。',
+            'error'
+        );
+
+    }
+
+}
+
+
+async function promote(
+    type
+) {
+
+    try {
+
+        const response =
+            await fetch(
+                `/api/game/${encodeURIComponent(
+                    gameId
+                )}/promote`,
+                {
+
+                    method:
+                        'POST',
+
+                    headers: {
+
+                        'Content-Type':
+                            'application/json'
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            type,
+                            token
+
+                        })
+
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.message ||
+                '昇格に失敗しました。'
+            );
+
+        }
+
+
+        promotionOverlay.classList.remove(
+            'show'
+        );
+
+
+        game =
+            data.game;
+
+        previousSnapshot =
+            getSnapshot(game);
+
+        renderGame();
+
+
+        showMessage(
+            '昇格しました。',
+            'success'
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+        showMessage(
+            error.message ||
+            '昇格に失敗しました。',
+            'error'
+        );
+
+    }
+
+}
+
+
+async function resign() {
+
+    if (
+        !game ||
+        !token ||
+        !game.canControl ||
+        game.status !==
+            'playing'
+    ) {
+
+        return;
+
+    }
+
+
+    const confirmed =
+        window.confirm(
+            '本当に投了しますか？'
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `/api/game/${encodeURIComponent(
+                    gameId
+                )}/resign`,
+                {
+
+                    method:
+                        'POST',
+
+                    headers: {
+
+                        'Content-Type':
+                            'application/json'
+
+                    },
+
+                    body:
+                        JSON.stringify({
+                            token
+                        })
+
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.message ||
+                '投了に失敗しました。'
+            );
+
+        }
+
+
+        game =
+            data.game;
+
+        previousSnapshot =
+            getSnapshot(game);
+
+        renderGame();
+
+
+        showMessage(
+            '投了しました。',
+            'success'
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+        showMessage(
+            error.message ||
+            '投了に失敗しました。',
+            'error'
+        );
+
+    }
+
+}
+
+
+resignButton.addEventListener(
+    'click',
+    resign
+);
+
+
+document
+    .querySelectorAll(
+        '#promotionButtons button'
+    )
+    .forEach(
+        button => {
+
+            button.addEventListener(
+                'click',
+                () => {
+
+                    promote(
+                        button.dataset.type
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+if (!gameId) {
+
+    loadingElement.textContent =
+        'ゲームIDが指定されていません。';
+
+} else {
+
+    loadGame(true);
+
+    setInterval(
+        () => {
+
+            loadGame(false);
+
+        },
+        1000
+    );
+
+}
+
+</script>
+
+</body>
+
+</html>
