@@ -10,6 +10,8 @@ const app = express();
 
 const PORT = 3000;
 
+const MAX_ACTIVE_GAMES = 35;
+
 const DATA_DIR =
     path.join(__dirname, 'data');
 
@@ -38,9 +40,7 @@ app.use(express.static('public'));
 
 function ensureDataDirectory() {
 
-    if (
-        !fs.existsSync(DATA_DIR)
-    ) {
+    if (!fs.existsSync(DATA_DIR)) {
 
         fs.mkdirSync(
             DATA_DIR,
@@ -83,9 +83,7 @@ function loadGames() {
 
     ensureDataDirectory();
 
-    if (
-        !fs.existsSync(GAMES_FILE)
-    ) {
+    if (!fs.existsSync(GAMES_FILE)) {
 
         return {};
 
@@ -99,9 +97,7 @@ function loadGames() {
                 'utf8'
             );
 
-        if (
-            !raw.trim()
-        ) {
+        if (!raw.trim()) {
 
             return {};
 
@@ -200,9 +196,7 @@ function getGameUrl(
         `${WEB_PUBLIC_URL}/?game=` +
         encodeURIComponent(gameId);
 
-    if (
-        token
-    ) {
+    if (token) {
 
         url +=
             `&token=${encodeURIComponent(token)}`;
@@ -210,6 +204,18 @@ function getGameUrl(
     }
 
     return url;
+
+}
+
+
+function getActiveGameCount() {
+
+    return Object.values(games)
+        .filter(
+            game =>
+                game.status === 'playing'
+        )
+        .length;
 
 }
 
@@ -223,9 +229,7 @@ function getPlayerColor(
     token
 ) {
 
-    if (
-        !token
-    ) {
+    if (!token) {
 
         return null;
 
@@ -265,9 +269,7 @@ function requirePlayer(
             token
         );
 
-    if (
-        !color
-    ) {
+    if (!color) {
 
         return {
 
@@ -422,9 +424,7 @@ function cleanupFinishedGames() {
 
         }
 
-        if (
-            !game.finishedAt
-        ) {
+        if (!game.finishedAt) {
 
             continue;
 
@@ -459,9 +459,7 @@ function cleanupFinishedGames() {
 
     }
 
-    if (
-        removed > 0
-    ) {
+    if (removed > 0) {
 
         saveGames();
 
@@ -479,8 +477,6 @@ setInterval(
     CLEANUP_INTERVAL_MS
 );
 
-
-// 起動直後にも一度整理
 cleanupFinishedGames();
 
 
@@ -501,7 +497,13 @@ app.get(
                 'Discord Chess Server is connected',
 
             games:
-                Object.keys(games).length
+                Object.keys(games).length,
+
+            activeGames:
+                getActiveGameCount(),
+
+            maxActiveGames:
+                MAX_ACTIVE_GAMES
 
         });
 
@@ -526,9 +528,7 @@ app.get(
                 .filter(
                     game => {
 
-                        if (
-                            !activeOnly
-                        ) {
+                        if (!activeOnly) {
 
                             return true;
 
@@ -553,7 +553,13 @@ app.get(
                 true,
 
             games:
-                result
+                result,
+
+            activeGames:
+                getActiveGameCount(),
+
+            maxActiveGames:
+                MAX_ACTIVE_GAMES
 
         });
 
@@ -571,6 +577,40 @@ app.post(
 
         try {
 
+            cleanupFinishedGames();
+
+            const activeGames =
+                getActiveGameCount();
+
+            if (
+                activeGames >=
+                MAX_ACTIVE_GAMES
+            ) {
+
+                return res.status(409).json({
+
+                    success:
+                        false,
+
+                    code:
+                        'MAX_ACTIVE_GAMES',
+
+                    message:
+                        `現在進行中の対局が` +
+                        `${MAX_ACTIVE_GAMES}局に達しています。` +
+                        `新しい対局を開始するには、` +
+                        `現在の対局を終了してください。`,
+
+                    activeGames,
+
+                    maxActiveGames:
+                        MAX_ACTIVE_GAMES
+
+                });
+
+            }
+
+
             const {
 
                 whiteUserId,
@@ -584,6 +624,7 @@ app.post(
                     '黒'
 
             } = req.body;
+
 
             if (
                 !whiteUserId ||
@@ -602,6 +643,7 @@ app.post(
 
             }
 
+
             if (
                 String(whiteUserId) ===
                 String(blackUserId)
@@ -619,6 +661,7 @@ app.post(
 
             }
 
+
             const state =
                 chess.createGameState();
 
@@ -627,6 +670,7 @@ app.post(
 
             const now =
                 new Date().toISOString();
+
 
             const game = {
 
@@ -705,10 +749,13 @@ app.post(
 
             };
 
+
             games[gameId] =
                 game;
 
+
             saveGames();
+
 
             res.status(201).json({
 
@@ -719,6 +766,12 @@ app.post(
 
                 game:
                     publicGame(game),
+
+                activeGames:
+                    getActiveGameCount(),
+
+                maxActiveGames:
+                    MAX_ACTIVE_GAMES,
 
                 playerUrls: {
 
@@ -742,6 +795,7 @@ app.post(
                     )
 
             });
+
 
         } catch (error) {
 
@@ -779,9 +833,7 @@ app.get(
                 req.params.gameId
             ];
 
-        if (
-            !game
-        ) {
+        if (!game) {
 
             return res.status(404).json({
 
@@ -831,9 +883,7 @@ app.post(
                 req.params.gameId
             ];
 
-        if (
-            !game
-        ) {
+        if (!game) {
 
             return res.status(404).json({
 
@@ -916,9 +966,7 @@ app.post(
                     req.params.gameId
                 ];
 
-            if (
-                !game
-            ) {
+            if (!game) {
 
                 return res.status(404).json({
 
@@ -936,9 +984,7 @@ app.post(
                 square
             } = req.body;
 
-            if (
-                !square
-            ) {
+            if (!square) {
 
                 return res.status(400).json({
 
@@ -964,9 +1010,7 @@ app.post(
                     token
                 );
 
-            if (
-                !auth.ok
-            ) {
+            if (!auth.ok) {
 
                 return res.status(403).json(
                     auth.response
@@ -1068,9 +1112,7 @@ app.post(
                     req.params.gameId
                 ];
 
-            if (
-                !game
-            ) {
+            if (!game) {
 
                 return res.status(404).json({
 
@@ -1118,9 +1160,7 @@ app.post(
                     token
                 );
 
-            if (
-                !auth.ok
-            ) {
+            if (!auth.ok) {
 
                 return res.status(403).json(
                     auth.response
@@ -1208,16 +1248,12 @@ app.post(
 
             const selectedMove =
                 legalMoves.find(
-
                     move =>
                         move.to ===
                         to
-
                 );
 
-            if (
-                !selectedMove
-            ) {
+            if (!selectedMove) {
 
                 return res.status(400).json({
 
@@ -1351,9 +1387,7 @@ app.post(
                     req.params.gameId
                 ];
 
-            if (
-                !game
-            ) {
+            if (!game) {
 
                 return res.status(404).json({
 
@@ -1398,9 +1432,7 @@ app.post(
                     token
                 );
 
-            if (
-                !auth.ok
-            ) {
+            if (!auth.ok) {
 
                 return res.status(403).json(
                     auth.response
@@ -1442,9 +1474,7 @@ app.post(
 
             }
 
-            if (
-                !game.pendingPromotion
-            ) {
+            if (!game.pendingPromotion) {
 
                 return res.status(400).json({
 
@@ -1472,9 +1502,7 @@ app.post(
 
                 );
 
-            if (
-                !result
-            ) {
+            if (!result) {
 
                 return res.status(400).json({
 
@@ -1569,9 +1597,7 @@ app.post(
                     req.params.gameId
                 ];
 
-            if (
-                !game
-            ) {
+            if (!game) {
 
                 return res.status(404).json({
 
@@ -1595,9 +1621,7 @@ app.post(
                     token
                 );
 
-            if (
-                !auth.ok
-            ) {
+            if (!auth.ok) {
 
                 return res.status(403).json(
                     auth.response
@@ -1723,9 +1747,7 @@ app.post(
                     req.params.gameId
                 ];
 
-            if (
-                !game
-            ) {
+            if (!game) {
 
                 return res.status(404).json({
 
@@ -1749,9 +1771,7 @@ app.post(
                     token
                 );
 
-            if (
-                !auth.ok
-            ) {
+            if (!auth.ok) {
 
                 return res.status(403).json(
                     auth.response
@@ -1889,12 +1909,22 @@ app.listen(
         );
 
         console.log(
+            `最大同時対局数: ${MAX_ACTIVE_GAMES}`
+        );
+
+        console.log(
             `保存先: ${GAMES_FILE}`
         );
 
         console.log(
             `登録ゲーム数: ${
                 Object.keys(games).length
+            }`
+        );
+
+        console.log(
+            `進行中ゲーム数: ${
+                getActiveGameCount()
             }`
         );
 
