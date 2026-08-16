@@ -9,37 +9,64 @@ const {
 const commands = [
 
     new SlashCommandBuilder()
+
         .setName('chess')
-        .setDescription('Discord Chessを操作します。')
+
+        .setDescription(
+            'Discord Chessを操作します。'
+        )
 
         // ====================================================
         // 対局開始
         // ====================================================
 
-        .addSubcommand(subcommand =>
-            subcommand
-                .setName('start')
-                .setDescription('Webでチェス対局を開始します。')
+        .addSubcommand(
+            subcommand =>
+                subcommand
 
-                .addUserOption(option =>
-                    option
-                        .setName('opponent')
-                        .setDescription('対戦相手')
-                        .setRequired(true)
-                )
+                    .setName('start')
+
+                    .setDescription(
+                        'Webでチェス対局を開始します。'
+                    )
+
+                    .addUserOption(
+                        option =>
+                            option
+
+                                .setName(
+                                    'opponent'
+                                )
+
+                                .setDescription(
+                                    '対戦相手'
+                                )
+
+                                .setRequired(
+                                    true
+                                )
+                    )
         )
 
         // ====================================================
-        // 対局一覧
+        // 参加中の対局・URL復旧
         // ====================================================
 
-        .addSubcommand(subcommand =>
-            subcommand
-                .setName('games')
-                .setDescription('現在進行中の対局を確認します。')
+        .addSubcommand(
+            subcommand =>
+                subcommand
+
+                    .setName('games')
+
+                    .setDescription(
+                        '参加中の対局と操作URLを確認します。'
+                    )
         )
 
-].map(command => command.toJSON());
+].map(
+    command =>
+        command.toJSON()
+);
 
 
 const rest =
@@ -73,7 +100,10 @@ const rest =
             ),
 
             {
-                body: commands
+
+                body:
+                    commands
+
             }
 
         );
@@ -89,7 +119,8 @@ const rest =
             error
         );
 
-        process.exitCode = 1;
+        process.exitCode =
+            1;
 
     }
 

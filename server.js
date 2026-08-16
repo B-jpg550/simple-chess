@@ -28,6 +28,10 @@ const WEB_PUBLIC_URL =
     process.env.WEB_PUBLIC_URL ||
     `http://localhost:${PORT}`;
 
+const CHESS_INTERNAL_SECRET =
+    process.env.CHESS_INTERNAL_SECRET ||
+    '';
+
 
 app.use(cors());
 app.use(express.json());
@@ -35,7 +39,7 @@ app.use(express.static('public'));
 
 
 // ============================================================
-// データ
+// データ保存
 // ============================================================
 
 function ensureDataDirectory() {
@@ -560,6 +564,193 @@ app.get(
 
             maxActiveGames:
                 MAX_ACTIVE_GAMES
+
+        });
+
+    }
+);
+
+
+// ============================================================
+// Discord Bot用 URL復旧API
+// ============================================================
+
+app.post(
+    '/api/discord-recovery',
+    (req, res) => {
+
+        if (
+            !CHESS_INTERNAL_SECRET
+        ) {
+
+            return res.status(500).json({
+
+                success:
+                    false,
+
+                message:
+                    'CHESS_INTERNAL_SECRETが設定されていません。'
+
+            });
+
+        }
+
+        const secret =
+            req.headers[
+                'x-chess-internal-secret'
+            ];
+
+        if (
+            secret !==
+            CHESS_INTERNAL_SECRET
+        ) {
+
+            return res.status(403).json({
+
+                success:
+                    false,
+
+                message:
+                    'Internal authentication failed'
+
+            });
+
+        }
+
+        const {
+            userId
+        } = req.body;
+
+        if (!userId) {
+
+            return res.status(400).json({
+
+                success:
+                    false,
+
+                message:
+                    'userId is required'
+
+            });
+
+        }
+
+        const userGames = [];
+
+
+        for (
+            const game
+                of Object.values(games)
+        ) {
+
+            if (
+                game.status !==
+                'playing'
+            ) {
+
+                continue;
+
+            }
+
+
+            let color =
+                null;
+
+
+            if (
+                String(
+                    game.players.white.userId
+                ) ===
+                String(userId)
+            ) {
+
+                color =
+                    chess.WHITE;
+
+            }
+
+
+            if (
+                String(
+                    game.players.black.userId
+                ) ===
+                String(userId)
+            ) {
+
+                color =
+                    chess.BLACK;
+
+            }
+
+
+            if (!color) {
+
+                continue;
+
+            }
+
+
+            userGames.push({
+
+                gameId:
+                    game.id,
+
+                color,
+
+                white: {
+
+                    userId:
+                        game.players.white.userId,
+
+                    name:
+                        game.players.white.name
+
+                },
+
+                black: {
+
+                    userId:
+                        game.players.black.userId,
+
+                    name:
+                        game.players.black.name
+
+                },
+
+                turn:
+                    game.turn,
+
+                status:
+                    game.status,
+
+                chessStatus:
+                    getGameStatus(game),
+
+                playerUrl:
+                    getGameUrl(
+                        game.id,
+                        color === chess.WHITE
+                            ? game.players.white.token
+                            : game.players.black.token
+                    ),
+
+                observerUrl:
+                    getGameUrl(
+                        game.id
+                    )
+
+            });
+
+        }
+
+
+        res.json({
+
+            success:
+                true,
+
+            games:
+                userGames
 
         });
 
@@ -1879,7 +2070,7 @@ app.use(
 
 
 // ============================================================
-// サーバー起動
+// 起動
 // ============================================================
 
 app.listen(
@@ -1929,7 +2120,7 @@ app.listen(
         );
 
         console.log(
-            '終了対局の保存期間: 24時間'
+            `終了対局の保存期間: 24時間`
         );
 
         console.log(

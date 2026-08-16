@@ -6,17 +6,29 @@ const {
     EmbedBuilder
 } = require('discord.js');
 
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds
-    ]
-});
+
+const client =
+    new Client({
+
+        intents: [
+            GatewayIntentBits.Guilds
+        ]
+
+    });
+
 
 const SERVER_URL =
     process.env.CHESS_SERVER_URL ||
     'http://localhost:3000';
 
-const monitoredMessages = new Map();
+
+const INTERNAL_SECRET =
+    process.env.CHESS_INTERNAL_SECRET ||
+    '';
+
+
+const monitoredMessages =
+    new Map();
 
 
 // ============================================================
@@ -67,34 +79,38 @@ async function createGame(
             `${SERVER_URL}/api/games`,
             {
 
-                method: 'POST',
+                method:
+                    'POST',
 
                 headers: {
+
                     'Content-Type':
                         'application/json'
+
                 },
 
-                body: JSON.stringify({
+                body:
+                    JSON.stringify({
 
-                    whiteUserId:
-                        String(whiteUserId),
+                        whiteUserId:
+                            String(whiteUserId),
 
-                    blackUserId:
-                        String(blackUserId),
+                        blackUserId:
+                            String(blackUserId),
 
-                    whiteName:
                         whiteName,
 
-                    blackName:
                         blackName
 
-                })
+                    })
 
             }
         );
 
+
     const data =
         await response.json();
+
 
     if (!response.ok) {
 
@@ -104,6 +120,7 @@ async function createGame(
         );
 
     }
+
 
     return data;
 
@@ -125,31 +142,39 @@ async function registerDiscordMessage(
 
             {
 
-                method: 'POST',
+                method:
+                    'POST',
 
                 headers: {
+
                     'Content-Type':
                         'application/json'
+
                 },
 
-                body: JSON.stringify({
+                body:
+                    JSON.stringify({
 
-                    channelId:
-                        String(channelId),
+                        channelId:
+                            String(channelId),
 
-                    messageId:
-                        String(messageId)
+                        messageId:
+                            String(messageId)
 
-                })
+                    })
 
             }
 
         );
 
+
     const data =
         await response
             .json()
-            .catch(() => ({}));
+            .catch(
+                () => ({})
+            );
+
 
     if (!response.ok) {
 
@@ -160,23 +185,81 @@ async function registerDiscordMessage(
 
     }
 
+
     return data;
 
 }
 
 
 // ============================================================
-// 表示
+// URL復旧API
 // ============================================================
 
-function turnText(turn) {
+async function recoverUserGames(
+    userId
+) {
 
-    return turn === 'white'
-        ? '⚪ 白の手番'
-        : '⚫ 黒の手番';
+    if (!INTERNAL_SECRET) {
+
+        throw new Error(
+            'CHESS_INTERNAL_SECRETが設定されていません。'
+        );
+
+    }
+
+
+    const response =
+        await fetch(
+            `${SERVER_URL}/api/discord-recovery`,
+            {
+
+                method:
+                    'POST',
+
+                headers: {
+
+                    'Content-Type':
+                        'application/json',
+
+                    'x-chess-internal-secret':
+                        INTERNAL_SECRET
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        userId:
+                            String(userId)
+
+                    })
+
+            }
+        );
+
+
+    const data =
+        await response.json();
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            data.message ||
+            'URL recovery failed'
+        );
+
+    }
+
+
+    return data.games || [];
 
 }
 
+
+// ============================================================
+// Discord表示
+// ============================================================
 
 function getPlayerName(
     player
@@ -188,6 +271,17 @@ function getPlayerName(
     )
         ? player.name
         : '不明';
+
+}
+
+
+function turnText(
+    turn
+) {
+
+    return turn === 'white'
+        ? '⚪ 白の手番'
+        : '⚫ 黒の手番';
 
 }
 
@@ -204,7 +298,7 @@ function getStatus(
         if (
             game.result &&
             game.result.type ===
-            'resignation'
+                'resignation'
         ) {
 
             const winner =
@@ -220,14 +314,15 @@ function getStatus(
 
         }
 
+
         if (
             game.chessStatus ===
-            'checkmate'
+                'checkmate'
         ) {
 
             const winner =
                 game.turn ===
-                'white'
+                    'white'
                     ? '⚫ 黒'
                     : '⚪ 白';
 
@@ -238,9 +333,10 @@ function getStatus(
 
         }
 
+
         if (
             game.chessStatus ===
-            'stalemate'
+                'stalemate'
         ) {
 
             return (
@@ -250,6 +346,7 @@ function getStatus(
 
         }
 
+
         return '🏁 対局終了';
 
     }
@@ -257,7 +354,7 @@ function getStatus(
 
     if (
         game.chessStatus ===
-        'check'
+            'check'
     ) {
 
         return '⚠️ チェック';
@@ -280,6 +377,7 @@ function boardToString(
     text +=
         '    A B C D E F G H\n';
 
+
     for (
         let row = 0;
         row < 8;
@@ -288,6 +386,7 @@ function boardToString(
 
         text +=
             `${8 - row}  `;
+
 
         for (
             let col = 0;
@@ -300,16 +399,19 @@ function boardToString(
 
         }
 
+
         text +=
             ` ${8 - row}\n`;
 
     }
+
 
     text +=
         '    A B C D E F G H\n';
 
     text +=
         '```';
+
 
     return text;
 
@@ -338,14 +440,14 @@ function getLastMoveText(
 
     }
 
-    const last =
-        game.lastMove;
 
     let text =
-        `${last.from} → ${last.to}`;
+        `${game.lastMove.from} → ` +
+        `${game.lastMove.to}`;
+
 
     if (
-        last.type ===
+        game.lastMove.type ===
         'castleKingSide'
     ) {
 
@@ -354,8 +456,9 @@ function getLastMoveText(
 
     }
 
+
     if (
-        last.type ===
+        game.lastMove.type ===
         'castleQueenSide'
     ) {
 
@@ -364,8 +467,9 @@ function getLastMoveText(
 
     }
 
+
     if (
-        last.type ===
+        game.lastMove.type ===
         'enPassant'
     ) {
 
@@ -373,6 +477,7 @@ function getLastMoveText(
             '（アンパッサン）';
 
     }
+
 
     return text;
 
@@ -383,111 +488,127 @@ function buildEmbed(
     game
 ) {
 
-    const status =
-        getStatus(game);
+    return new EmbedBuilder()
 
-    const turn =
-        turnText(
-            game.turn
+        .setTitle(
+            '♟️ Discord Chess'
+        )
+
+        .setDescription(
+            'サーバー上のWeb対局を監視しています。'
+        )
+
+        .addFields(
+
+            {
+
+                name:
+                    '⚪ 白',
+
+                value:
+                    getPlayerName(
+                        game.white
+                    ),
+
+                inline:
+                    true
+
+            },
+
+            {
+
+                name:
+                    '⚫ 黒',
+
+                value:
+                    getPlayerName(
+                        game.black
+                    ),
+
+                inline:
+                    true
+
+            },
+
+            {
+
+                name:
+                    '状態',
+
+                value:
+                    getStatus(game),
+
+                inline:
+                    false
+
+            },
+
+            {
+
+                name:
+                    '手番',
+
+                value:
+                    turnText(
+                        game.turn
+                    ),
+
+                inline:
+                    true
+
+            },
+
+            {
+
+                name:
+                    '最後の手',
+
+                value:
+                    getLastMoveText(
+                        game
+                    ),
+
+                inline:
+                    true
+
+            },
+
+            {
+
+                name:
+                    '対局ID',
+
+                value:
+                    `\`${game.id}\``,
+
+                inline:
+                    false
+
+            },
+
+            {
+
+                name:
+                    '観戦URL',
+
+                value:
+                    getObserverUrl(
+                        game.id
+                    ),
+
+                inline:
+                    false
+
+            }
+
+        )
+
+        .setTimestamp(
+            new Date(
+                game.updatedAt ||
+                Date.now()
+            )
         );
-
-    const embed =
-        new EmbedBuilder()
-            .setTitle(
-                '♟️ Discord Chess'
-            )
-            .setDescription(
-                'サーバー上のWeb対局を監視しています。'
-            )
-            .addFields(
-
-                {
-                    name:
-                        '⚪ 白',
-
-                    value:
-                        getPlayerName(
-                            game.white
-                        ),
-
-                    inline: true
-                },
-
-                {
-                    name:
-                        '⚫ 黒',
-
-                    value:
-                        getPlayerName(
-                            game.black
-                        ),
-
-                    inline: true
-                },
-
-                {
-                    name:
-                        '現在の状態',
-
-                    value:
-                        status,
-
-                    inline: false
-                },
-
-                {
-                    name:
-                        '手番',
-
-                    value:
-                        turn,
-
-                    inline: true
-                },
-
-                {
-                    name:
-                        '最後の手',
-
-                    value:
-                        getLastMoveText(
-                            game
-                        ),
-
-                    inline: true
-                },
-
-                {
-                    name:
-                        '対局ID',
-
-                    value:
-                        `\`${game.id}\``,
-
-                    inline: false
-                },
-
-                {
-                    name:
-                        '観戦URL',
-
-                    value:
-                        getObserverUrl(
-                            game.id
-                        ),
-
-                    inline: false
-                }
-
-            )
-            .setTimestamp(
-                new Date(
-                    game.updatedAt ||
-                    Date.now()
-                )
-            );
-
-    return embed;
 
 }
 
@@ -496,15 +617,12 @@ function buildMessage(
     game
 ) {
 
-    const text =
-        boardToString(
-            game.board
-        );
-
     return {
 
         content:
-            text,
+            boardToString(
+                game.board
+            ),
 
         embeds: [
             buildEmbed(
@@ -518,7 +636,7 @@ function buildMessage(
 
 
 // ============================================================
-// Discord監視更新
+// Discord監視
 // ============================================================
 
 async function updateMonitoredMessage(
@@ -535,14 +653,11 @@ async function updateMonitoredMessage(
 
     }
 
+
     const cacheKey =
         `${game.discord.channelId}:` +
         `${game.discord.messageId}`;
 
-    const previous =
-        monitoredMessages.get(
-            cacheKey
-        );
 
     const signature =
         JSON.stringify({
@@ -560,9 +675,19 @@ async function updateMonitoredMessage(
                 game.board,
 
             lastMove:
-                game.lastMove
+                game.lastMove,
+
+            chessStatus:
+                game.chessStatus
 
         });
+
+
+    const previous =
+        monitoredMessages.get(
+            cacheKey
+        );
+
 
     if (
         previous ===
@@ -573,6 +698,7 @@ async function updateMonitoredMessage(
 
     }
 
+
     try {
 
         const channel =
@@ -580,29 +706,35 @@ async function updateMonitoredMessage(
                 game.discord.channelId
             );
 
+
         if (!channel) {
+
             return;
+
         }
+
 
         const message =
             await channel.messages.fetch(
                 game.discord.messageId
             );
 
+
         await message.edit(
             buildMessage(game)
         );
+
 
         monitoredMessages.set(
             cacheKey,
             signature
         );
 
+
     } catch (error) {
 
         console.error(
-            `監視更新失敗 ` +
-            `${game.id}:`,
+            `監視更新失敗 ${game.id}:`,
             error.message
         );
 
@@ -622,8 +754,10 @@ async function refreshGames() {
         const games =
             await getGames();
 
+
         for (
-            const game of games
+            const game
+                of games
         ) {
 
             await updateMonitoredMessage(
@@ -631,6 +765,7 @@ async function refreshGames() {
             );
 
         }
+
 
     } catch (error) {
 
@@ -645,7 +780,7 @@ async function refreshGames() {
 
 
 // ============================================================
-// 起動
+// Bot起動
 // ============================================================
 
 client.once(
@@ -656,15 +791,19 @@ client.once(
             `${client.user.tag}としてログインしました！`
         );
 
+
         console.log(
             `Web Server: ${SERVER_URL}`
         );
+
 
         console.log(
             'Discord監視モードで起動しました。'
         );
 
+
         await refreshGames();
+
 
         setInterval(
             refreshGames,
@@ -691,6 +830,7 @@ client.on(
 
         }
 
+
         if (
             interaction.commandName !==
             'chess'
@@ -699,6 +839,7 @@ client.on(
             return;
 
         }
+
 
         const subcommand =
             interaction.options
@@ -719,6 +860,7 @@ client.on(
                     .getUser(
                         'opponent'
                     );
+
 
             if (!opponent) {
 
@@ -827,8 +969,10 @@ client.on(
 
                     content:
                         '⚪ **あなたは白です。**\n\n' +
-                        'Web対局URL:\n' +
-                        `${result.playerUrls.white}`,
+                        '**操作URL**\n' +
+                        `${result.playerUrls.white}\n\n` +
+                        '**観戦URL**\n' +
+                        `${result.observerUrl}`,
 
                     ephemeral:
                         true
@@ -841,19 +985,30 @@ client.on(
                     await opponent.send(
 
                         '♟️ **Discord Chess 対局開始**\n\n' +
+
                         `⚪ 白：${interaction.user.username}\n` +
+
                         `⚫ 黒：${opponent.username}\n\n` +
+
                         'あなたは黒です。\n\n' +
-                        'Web対局URL:\n' +
-                        `${result.playerUrls.black}`
+
+                        '**操作URL**\n' +
+                        `${result.playerUrls.black}\n\n` +
+
+                        '**観戦URL**\n' +
+                        `${result.observerUrl}`
 
                     );
+
 
                 } catch (dmError) {
 
                     console.error(
+
                         '黒プレイヤーへのDM失敗:',
+
                         dmError.message
+
                     );
 
                 }
@@ -865,6 +1020,7 @@ client.on(
                     'Game creation error:',
                     error
                 );
+
 
                 if (
                     !interaction.replied &&
@@ -886,6 +1042,7 @@ client.on(
 
             }
 
+
             return;
 
         }
@@ -902,26 +1059,21 @@ client.on(
 
             try {
 
-                const games =
-                    await getGames();
-
-                const active =
-                    games.filter(
-                        game =>
-                            game.status ===
-                            'playing'
+                const userGames =
+                    await recoverUserGames(
+                        interaction.user.id
                     );
 
 
                 if (
-                    active.length ===
+                    userGames.length ===
                     0
                 ) {
 
                     await interaction.reply({
 
                         content:
-                            '現在進行中の対局はありません。',
+                            '現在参加中の対局はありません。',
 
                         ephemeral:
                             true
@@ -934,23 +1086,54 @@ client.on(
 
 
                 let text =
-                    '♟️ **現在進行中の対局**\n\n';
+                    '♟️ **あなたが参加中の対局**\n\n';
 
 
                 for (
-                    const game of
-                        active
+                    const game
+                        of userGames
                 ) {
 
-                    text +=
-                        `**${getPlayerName(game.white)} ` +
-                        `vs ${getPlayerName(game.black)}**\n`;
+                    const colorText =
+                        game.color ===
+                            'white'
+                            ? '⚪ 白'
+                            : '⚫ 黒';
+
 
                     text +=
+                        `**${game.white.name} ` +
+                        `vs ${game.black.name}**\n`;
+
+
+                    text +=
+                        `${colorText} / ` +
                         `${turnText(game.turn)}\n`;
 
+
+                    if (
+                        game.chessStatus ===
+                            'check'
+                    ) {
+
+                        text +=
+                            '⚠️ 現在チェック\n';
+
+                    }
+
+
                     text +=
-                        `${getObserverUrl(game.id)}\n\n`;
+                        `**操作URL**\n` +
+                        `${game.playerUrl}\n`;
+
+
+                    text +=
+                        `**観戦URL**\n` +
+                        `${game.observerUrl}\n`;
+
+
+                    text +=
+                        `ID: \`${game.gameId}\`\n\n`;
 
                 }
 
@@ -965,17 +1148,20 @@ client.on(
 
                 });
 
+
             } catch (error) {
 
                 console.error(
-                    'Games command error:',
+                    'Games recovery error:',
                     error
                 );
+
 
                 await interaction.reply({
 
                     content:
-                        '❌ 対局一覧を取得できませんでした。',
+                        `❌ 対局URLの取得に失敗しました。\n` +
+                        `${error.message}`,
 
                     ephemeral:
                         true
@@ -987,11 +1173,12 @@ client.on(
         }
 
     }
+
 );
 
 
 // ============================================================
-// ログイン
+// Discordログイン
 // ============================================================
 
 client.login(
